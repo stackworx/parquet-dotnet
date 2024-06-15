@@ -822,7 +822,14 @@ namespace Parquet.Encodings {
                     }
                     break;
                 case TType.INT64:
-                    if(tse.ConvertedType == ConvertedType.TIMESTAMP_MILLIS) {
+                    if(tse.LogicalType?.TIMESTAMP is not null) {
+                        foreach(DateTime element in data) {
+                            // TODO: check docs
+                            long unixTime = element.ToUnixMilliseconds();
+                            byte[] raw = BitConverter.GetBytes(unixTime);
+                            destination.Write(raw, 0, raw.Length);
+                        }
+                    } else if(tse.ConvertedType == ConvertedType.TIMESTAMP_MILLIS) {
                         foreach(DateTime element in data) {
                             long unixTime = element.ToUtc().ToUnixMilliseconds();
                             byte[] raw = BitConverter.GetBytes(unixTime);
@@ -896,7 +903,14 @@ namespace Parquet.Encodings {
                     long[] longs = ArrayPool<long>.Shared.Rent(data.Length);
                     try {
                         int longsRead = Decode(source, longs.AsSpan(0, data.Length));
-                        if(tse.ConvertedType == ConvertedType.TIMESTAMP_MICROS) {
+                        if(tse.LogicalType?.TIMESTAMP is not null) {
+                            // TODO: unit
+                            for(int i = 0; i < longsRead; i++) {
+                                DateTime dt = longs[i].AsUnixMillisecondsInDateTime();
+                                dt = DateTime.SpecifyKind(dt, tse.LogicalType.TIMESTAMP.IsAdjustedToUTC ? DateTimeKind.Utc : DateTimeKind.Local);
+                                data[i] = dt;
+                            }
+                        } else if(tse.ConvertedType == ConvertedType.TIMESTAMP_MICROS) {
                             for(int i = 0; i < longsRead; i++) {
                                 long lv = longs[i];
                                 long microseconds = lv % 1000;

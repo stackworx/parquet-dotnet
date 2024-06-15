@@ -201,7 +201,7 @@ namespace Parquet.Encodings {
                     _ => typeof(int)
                 },
                 Type.INT32 => typeof(int),
-
+                Type.INT64 when se.LogicalType?.TIMESTAMP != null => typeof(DateTime),
                 Type.INT64 when se.ConvertedType != null => se.ConvertedType switch {
                     ConvertedType.INT_64 => typeof(long),
                     ConvertedType.UINT_64 => typeof(ulong),
@@ -267,6 +267,11 @@ namespace Parquet.Encodings {
                 se.Scale.GetValueOrDefault(DecimalFormatDefaults.DefaultScale));
 
         private static DataField GetDateTimeDataField(SchemaElement se) {
+            if(se.LogicalType is not null)
+                if(se.LogicalType.TIMESTAMP is not null)
+                    // TODO: unit
+                    return new DateTimeDataField(se.Name, DateTimeFormat.Timestamp, se.LogicalType.TIMESTAMP.IsAdjustedToUTC);
+            
             switch(se.ConvertedType) {
                 case ConvertedType.TIMESTAMP_MILLIS:
                     if(se.Type == Type.INT64)
@@ -464,6 +469,14 @@ namespace Parquet.Encodings {
                         case DateTimeFormat.Date:
                             tse.Type = Type.INT32;
                             tse.ConvertedType = ConvertedType.DATE;
+                            break;
+                        case DateTimeFormat.Timestamp:
+                            tse.Type = Type.INT64;
+                            tse.LogicalType = new LogicalType { TIMESTAMP = new TimestampType {
+                                IsAdjustedToUTC = dfDateTime.IsAdjustedToUTC,
+                                // TODO: unit
+                                // Unit = 
+                            } };
                             break;
                         default:
                             tse.Type = Type.INT96;
